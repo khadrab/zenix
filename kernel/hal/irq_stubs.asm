@@ -1,3 +1,13 @@
+extern irq_handler
+
+%macro IRQ 2
+irq%1:
+    cli
+    push byte 0
+    push byte %2
+    jmp irq_common_stub
+%endmacro
+
 global irq0
 global irq1
 global irq2
@@ -14,16 +24,6 @@ global irq12
 global irq13
 global irq14
 global irq15
-
-extern irq_handler
-
-%macro IRQ 2
-irq%1:
-    cli
-    push 0
-    push %2
-    jmp irq_common_stub
-%endmacro
 
 IRQ 0,  32
 IRQ 1,  33
@@ -54,7 +54,9 @@ irq_common_stub:
     mov fs, ax
     mov gs, ax
     
+    push esp
     call irq_handler
+    add esp, 4
     
     pop eax
     mov ds, ax

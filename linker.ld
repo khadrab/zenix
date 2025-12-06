@@ -5,7 +5,8 @@ ENTRY(_start)                     /* boot/boot.asm must define _start */
 SECTIONS
 {
     /* Kernel is loaded at 1 MiB (0x100000) – standard for higher-half or just safe physical address */
-    . = 1M;
+    . = 1M;    
+    kernel_start = .;
 
     /* ============== .text – code (read+execute only) ============== */
     .text BLOCK(4K) : ALIGN(4K)
@@ -40,8 +41,5 @@ SECTIONS
         *(.comment)
         *(.note*)
     }
+    kernel_end   = .;
 }
-
-/* Add these symbols so you can use them in C code if you want */
-__kernel_start = 1M;
-__kernel_end   = .;

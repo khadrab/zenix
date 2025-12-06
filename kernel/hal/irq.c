@@ -31,13 +31,15 @@ void irq_install() {
 }
 
 void irq_handler(registers_t* regs) {
-    if (regs->int_no >= 40) {
-        outb(0xA0, 0x20);
-    }
-    outb(0x20, 0x20);
-    
+    // Call handler
     if (interrupt_handlers[regs->int_no]) {
         isr_t handler = interrupt_handlers[regs->int_no];
         handler(regs);
     }
+    
+    // Send EOI
+    if (regs->int_no >= 40) {
+        outb(0xA0, 0x20);
+    }
+    outb(0x20, 0x20);
 }

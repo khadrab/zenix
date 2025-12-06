@@ -24,7 +24,16 @@ KERNEL_OBJS = boot/boot.o \
               kernel/hal/irq.o \
               kernel/hal/irq_stubs.o \
               kernel/hal/pic.o \
-              kernel/drivers/timer/pit.o
+              kernel/mm/pmm.o \
+              kernel/mm/heap.o \
+              kernel/proc/process.o \
+              kernel/proc/scheduler.o \
+              kernel/proc/switch.o \
+              kernel/drivers/timer/pit.o \
+              kernel/drivers/keyboard/keyboard.o \
+			  kernel/mm/paging.o \
+              kernel/shell/shell.o \
+              lib/libc/string.o
 
 all: zenix.bin
 
@@ -46,14 +55,16 @@ zenix.iso: zenix.bin
 	grub-mkrescue -o $(OUT_BUILD)/zenix.iso isodir
 
 run: zenix.bin
-	qemu-system-i386 -kernel $(OUT_BINARY)/zenix.bin
+	qemu-system-i386 -kernel $(OUT_BINARY)/zenix.bin -d cpu_reset
 
 debug: zenix.bin
-	qemu-system-i386 -kernel zenix.bin -s -S &
-	gdb -ex "target remote localhost:1234" -ex "symbol-file zenix.bin"
+	qemu-system-i386 -kernel $(OUT_BINARY)/zenix.bin -s -S &
+	gdb -ex "target remote localhost:1234" -ex "symbol-file $(OUT_BINARY)/zenix.bin"
 
 clean:
-	rm -f boot/*.o kernel/core/*.o kernel/hal/*.o kernel/drivers/timer/*.o zenix.bin zenix.iso
+	rm -f boot/*.o kernel/core/*.o kernel/hal/*.o kernel/mm/*.o \
+	      kernel/proc/*.o kernel/drivers/timer/*.o kernel/drivers/keyboard/*.o \
+	      kernel/shell/*.o lib/libc/*.o $(OUT_BINARY)/zenix.bin $(OUT_BUILD)/zenix.iso
 	rm -rf isodir
 
 .PHONY: all run debug clean
