@@ -23,9 +23,21 @@ KERNEL_OBJS = boot/boot.o \
               kernel/shell/shell.o \
               kernel/syscall/syscall.o kernel/syscall/syscall_stub.o kernel/syscall/handlers.o \
               kernel/usermode/usermode.o \
+              kernel/drivers/vga/vga.o \
+              kernel/drivers/mouse/mouse.o \
+              kernel/gui/gui.o \
               lib/libc/string.o
 
 .PHONY: all clean run
+
+kernel/drivers/vga/vga.o: kernel/drivers/vga/vga.c
+	$(CC) $(CFLAGS) -c -I./include -g $< -o $@
+
+kernel/drivers/mouse/mouse.o: kernel/drivers/mouse/mouse.c
+	$(CC) $(CFLAGS) -c -I./include -g $< -o $@
+
+kernel/gui/gui.o: kernel/gui/gui.c
+	$(CC) $(CFLAGS) -c -I./include -g $< -o $@
 
 all: $(OUT_BINARY)/zenix.bin
 

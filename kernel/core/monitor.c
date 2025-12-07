@@ -5,7 +5,6 @@ static uint8_t cursor_x = 0;
 static uint8_t cursor_y = 0;
 static uint8_t attribute = 0x0F;
 
-// Buffer للسطور القديمة (scrollback)
 #define SCROLLBACK_LINES 100
 static char scrollback_buffer[SCROLLBACK_LINES][80];
 static int scrollback_count = 0;
@@ -33,15 +32,12 @@ static void save_line_to_scrollback(void) {
 
 static void scroll(void) {
     if (cursor_y >= 25) {
-        // حفظ السطر الأول قبل المسح
         save_line_to_scrollback();
         
-        // تحريك كل الأسطر لأعلى
         for (int i = 0; i < 24 * 80; i++) {
             video_memory[i] = video_memory[i + 80];
         }
         
-        // مسح السطر الأخير
         for (int i = 24 * 80; i < 25 * 80; i++) {
             video_memory[i] = (attribute << 8) | ' ';
         }
@@ -52,8 +48,6 @@ static void scroll(void) {
 void scroll_up(void) {
     if (scrollback_offset < scrollback_count) {
         scrollback_offset++;
-        // إعادة رسم الشاشة من الـ buffer
-        // (تطبيق مبسط - يعرض رسالة فقط)
         print_string("[Scroll up - ");
         print_dec(scrollback_offset);
         print_string("/");

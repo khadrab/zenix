@@ -1,8 +1,5 @@
-// lib/libc/string.c - مكتبة معالجة النصوص الكاملة
-
 #include "string.h"
 
-// حساب طول النص
 uint32_t strlen(const char* str) {
     uint32_t len = 0;
     while (str[len]) {
@@ -11,7 +8,6 @@ uint32_t strlen(const char* str) {
     return len;
 }
 
-// مقارنة نصين
 int strcmp(const char* s1, const char* s2) {
     while (*s1 && (*s1 == *s2)) {
         s1++;
@@ -20,14 +16,12 @@ int strcmp(const char* s1, const char* s2) {
     return *(unsigned char*)s1 - *(unsigned char*)s2;
 }
 
-// نسخ نص
 char* strcpy(char* dest, const char* src) {
     char* ret = dest;
     while ((*dest++ = *src++));
     return ret;
 }
 
-// نسخ نص بحد أقصى
 char* strncpy(char* dest, const char* src, uint32_t n) {
     uint32_t i;
     for (i = 0; i < n && src[i] != '\0'; i++) {
@@ -39,7 +33,6 @@ char* strncpy(char* dest, const char* src, uint32_t n) {
     return dest;
 }
 
-// دمج نصين
 char* strcat(char* dest, const char* src) {
     char* ret = dest;
     while (*dest) {
@@ -49,7 +42,6 @@ char* strcat(char* dest, const char* src) {
     return ret;
 }
 
-// البحث عن حرف
 char* strchr(const char* str, int c) {
     while (*str) {
         if (*str == (char)c) {
@@ -60,7 +52,6 @@ char* strchr(const char* str, int c) {
     return NULL;
 }
 
-// نسخ ذاكرة
 void* memcpy(void* dest, const void* src, uint32_t n) {
     unsigned char* d = (unsigned char*)dest;
     const unsigned char* s = (const unsigned char*)src;
@@ -72,7 +63,6 @@ void* memcpy(void* dest, const void* src, uint32_t n) {
     return dest;
 }
 
-// تعيين قيمة للذاكرة
 void* memset(void* ptr, int value, uint32_t num) {
     unsigned char* p = (unsigned char*)ptr;
     
@@ -83,7 +73,6 @@ void* memset(void* ptr, int value, uint32_t num) {
     return ptr;
 }
 
-// مقارنة ذاكرة
 int memcmp(const void* ptr1, const void* ptr2, uint32_t num) {
     const unsigned char* p1 = (const unsigned char*)ptr1;
     const unsigned char* p2 = (const unsigned char*)ptr2;
@@ -97,7 +86,6 @@ int memcmp(const void* ptr1, const void* ptr2, uint32_t num) {
     return 0;
 }
 
-// نقل ذاكرة (يدعم التداخل)
 void* memmove(void* dest, const void* src, uint32_t n) {
     unsigned char* d = (unsigned char*)dest;
     const unsigned char* s = (const unsigned char*)src;
