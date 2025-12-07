@@ -1,43 +1,55 @@
+// kernel/hal/isr.c
+
 #include "isr.h"
 #include "idt.h"
 #include "../core/monitor.h"
 
-isr_t interrupt_handlers[256];
+// ISR handler table
+isr_handler_t interrupt_handlers[256];
 
-const char* exception_messages[32] = {
-    "Division by zero",
+// Exception messages
+static const char* exception_messages[] = {
+    "Division By Zero",
     "Debug",
-    "Non-maskable interrupt",
+    "Non Maskable Interrupt",
     "Breakpoint",
     "Overflow",
-    "Bound range exceeded",
-    "Invalid opcode",
-    "Device not available",
-    "Double fault",
-    "Coprocessor segment overrun",
+    "Bound Range Exceeded",
+    "Invalid Opcode",
+    "Device Not Available",
+    "Double Fault",
+    "Coprocessor Segment Overrun",
     "Invalid TSS",
-    "Segment not present",
-    "Stack-segment fault",
-    "General protection fault",
-    "Page fault",
-    "(reserved)",
-    "x87 floating-point exception",
-    "Alignment check",
-    "Machine check",
-    "SIMD floating-point exception",
-    "Virtualization exception",
-    "(reserved)", "(reserved)", "(reserved)", "(reserved)",
-    "(reserved)", "(reserved)", "(reserved)", "(reserved)",
-    "(reserved)",
-    "Security exception",
-    "(reserved)"
+    "Segment Not Present",
+    "Stack-Segment Fault",
+    "General Protection Fault",
+    "Page Fault",
+    "Reserved",
+    "x87 Floating-Point Exception",
+    "Alignment Check",
+    "Machine Check",
+    "SIMD Floating-Point Exception",
+    "Virtualization Exception",
+    "Reserved",
+    "Reserved",
+    "Reserved",
+    "Reserved",
+    "Reserved",
+    "Reserved",
+    "Reserved",
+    "Reserved",
+    "Reserved",
+    "Security Exception",
+    "Reserved"
 };
 
-void isr_register_handler(uint8_t n, isr_t handler) {
+// Register ISR handler
+void isr_register_handler(uint8_t n, isr_handler_t handler) {
     interrupt_handlers[n] = handler;
 }
 
-void isr_install() {
+// Install all ISRs
+void isr_install(void) {
     idt_set_gate(0,  (uint32_t)isr0,  0x08, 0x8E);
     idt_set_gate(1,  (uint32_t)isr1,  0x08, 0x8E);
     idt_set_gate(2,  (uint32_t)isr2,  0x08, 0x8E);
@@ -72,23 +84,46 @@ void isr_install() {
     idt_set_gate(31, (uint32_t)isr31, 0x08, 0x8E);
 }
 
+// Common ISR handler
 void isr_handler(registers_t* regs) {
-    if (interrupt_handlers[regs->int_no]) {
-        interrupt_handlers[regs->int_no](regs);
-        return;
+    // Call custom handler if registered
+    if (interrupt_handlers[regs->int_no] != 0) {
+        isr_handler_t handler = interrupt_handlers[regs->int_no];
+        handler(regs);
+    } else {
+        // Unhandled exception
+        print_string("\n!!! EXCEPTION: ");
+        if (regs->int_no < 32) {
+            print_string(exception_messages[regs->int_no]);
+        } else {
+            print_string("Unknown");
+        }
+        print_string(" !!!\n");
+        
+        print_string("Exception Number: ");
+        print_dec(regs->int_no);
+        print_string("\n");
+        
+        print_string("Error Code: 0x");
+        print_hex(regs->err_code);
+        print_string("\n");
+        
+        print_string("EIP: 0x");
+        print_hex(regs->eip);
+        print_string("\n");
+        
+        print_string("CS: 0x");
+        print_hex(regs->cs);
+        print_string("\n");
+        
+        print_string("EFLAGS: 0x");
+        print_hex(regs->eflags);
+        print_string("\n");
+        
+        // Halt the system
+        print_string("\nSystem halted.\n");
+        for(;;) {
+            asm volatile("cli; hlt");
+        }
     }
-
-    print_string("\nCPU Exception: 0x");
-    print_hex(regs->int_no);
-    if (regs->int_no < 32) {
-        print_string(" - ");
-        print_string(exception_messages[regs->int_no]);
-    }
-    print_string("\nERR: 0x");
-    print_hex(regs->err_code);
-    print_string("\nEIP: 0x");
-    print_hex(regs->eip);
-    print_string("\nSystem halted.\n");
-    
-    for(;;) asm("hlt");
 }

@@ -1,103 +1,81 @@
 #include "process.h"
-#include "../mm/heap.h"
-#include "../../lib/libc/string.h"
 #include "../core/monitor.h"
+#include "../mm/heap.h"
 #include "../drivers/timer/pit.h"
+#include "../../lib/libc/string.h"
+
+#define KERNEL_STACK_SIZE 4096
 
 process_t* process_table[MAX_PROCESSES];
-static uint32_t next_pid = 1;
-process_t* current_process = 0;
+static uint32_t next_pid = 0;
+process_t* current_process = NULL;
 
-void process_init() {
-    print_string("[PROC] Initializing process management...\n");
-    
+void process_init(void) {
     for (int i = 0; i < MAX_PROCESSES; i++) {
-        process_table[i] = 0;
+        process_table[i] = NULL;
     }
     
-    // Create idle process (PID 0)
-    process_t* idle = (process_t*)kmalloc(sizeof(process_t));
-    if (!idle) {
-        print_string("[PROC] Failed to create idle process!\n");
-        return;
-    }
+    current_process = (process_t*)kmalloc(sizeof(process_t));
+    memset(current_process, 0, sizeof(process_t));
     
-    idle->pid = 0;
-    strcpy(idle->name, "idle");
-    idle->state = PROCESS_RUNNING;
-    idle->kernel_stack = 0;
-    idle->created_at = timer_get_ticks();
-    idle->cpu_time = 0;
-    idle->next = 0;
+    current_process->pid = next_pid++;
+    strcpy(current_process->name, "idle");
+    current_process->state = PROCESS_RUNNING;
+    current_process->created_at = timer_get_ticks();
+    current_process->cpu_time = 0;
+    current_process->next = NULL;
     
-    process_table[0] = idle;
-    current_process = idle;
-    
-    print_string("[PROC] Process management initialized\n");
+    process_table[0] = current_process;
 }
 
-process_t* process_create(const char* name, void (*entry_point)()) {
-    // Find free slot
-    int slot = -1;
-    for (int i = 1; i < MAX_PROCESSES; i++) {
-        if (process_table[i] == 0) {
-            slot = i;
-            break;
-        }
+process_t* process_create(const char* name, void (*entry_point)(void)) {
+    if (next_pid >= MAX_PROCESSES) {
+        print_string("[PROC] Error: Process table full\n");
+        return NULL;
     }
     
-    if (slot == -1) {
-        print_string("[PROC] No free process slots!\n");
-        return 0;
-    }
-    
-    // Allocate process structure
     process_t* proc = (process_t*)kmalloc(sizeof(process_t));
     if (!proc) {
-        print_string("[PROC] Failed to allocate process!\n");
-        return 0;
+        print_string("[PROC] Error: Failed to allocate process\n");
+        return NULL;
     }
     
-    // Allocate kernel stack
-    uint32_t stack = (uint32_t)kmalloc(KERNEL_STACK_SIZE);
+    memset(proc, 0, sizeof(process_t));
+    
+    uint32_t* stack = (uint32_t*)kmalloc(KERNEL_STACK_SIZE);
     if (!stack) {
+        print_string("[PROC] Error: Failed to allocate stack\n");
         kfree(proc);
-        print_string("[PROC] Failed to allocate stack!\n");
-        return 0;
+        return NULL;
     }
     
-    // Initialize process
     proc->pid = next_pid++;
     strncpy(proc->name, name, 31);
     proc->name[31] = '\0';
     proc->state = PROCESS_READY;
-    proc->kernel_stack = stack + KERNEL_STACK_SIZE;
     proc->created_at = timer_get_ticks();
     proc->cpu_time = 0;
-    proc->next = 0;
+    proc->kernel_stack = (uint32_t)stack + KERNEL_STACK_SIZE;
     
-    // Setup initial stack frame
-    uint32_t* stack_ptr = (uint32_t*)proc->kernel_stack;
-    
-    *(--stack_ptr) = 0x202;           // EFLAGS (IF=1)
-    *(--stack_ptr) = (uint32_t)entry_point;  // EIP
-    *(--stack_ptr) = 0;               // EAX
-    *(--stack_ptr) = 0;               // ECX
-    *(--stack_ptr) = 0;               // EDX
-    *(--stack_ptr) = 0;               // EBX
-    *(--stack_ptr) = proc->kernel_stack; // ESP
-    *(--stack_ptr) = 0;               // EBP
-    *(--stack_ptr) = 0;               // ESI
-    *(--stack_ptr) = 0;               // EDI
-    
-    proc->regs.esp = (uint32_t)stack_ptr;
+    memset(&proc->regs, 0, sizeof(registers_t));
     proc->regs.eip = (uint32_t)entry_point;
+    proc->regs.cs = 0x08;
+    proc->regs.ds = 0x10;
     proc->regs.eflags = 0x202;
+    proc->regs.useresp = proc->kernel_stack;
+    proc->regs.ss = 0x10;
     
-    process_table[slot] = proc;
+    proc->next = NULL;
+    
+    for (int i = 0; i < MAX_PROCESSES; i++) {
+        if (process_table[i] == NULL) {
+            process_table[i] = proc;
+            break;
+        }
+    }
     
     print_string("[PROC] Created process: ");
-    print_string(name);
+    print_string(proc->name);
     print_string(" (PID ");
     print_dec(proc->pid);
     print_string(")\n");
@@ -106,65 +84,55 @@ process_t* process_create(const char* name, void (*entry_point)()) {
 }
 
 void process_terminate(process_t* proc) {
-    if (!proc || proc->pid == 0) {
-        return;  // Can't kill idle process
-    }
+    if (!proc) return;
     
     proc->state = PROCESS_TERMINATED;
     
-    // Free resources
-    if (proc->kernel_stack) {
-        kfree((void*)(proc->kernel_stack - KERNEL_STACK_SIZE));
-    }
+    print_string("[PROC] Process terminated: ");
+    print_string(proc->name);
+    print_string(" (PID ");
+    print_dec(proc->pid);
+    print_string(")\n");
     
-    // Remove from table
     for (int i = 0; i < MAX_PROCESSES; i++) {
         if (process_table[i] == proc) {
-            process_table[i] = 0;
+            process_table[i] = NULL;
             break;
         }
     }
     
+    if (proc->kernel_stack) {
+        kfree((void*)(proc->kernel_stack - KERNEL_STACK_SIZE));
+    }
     kfree(proc);
 }
 
-process_t* process_get_current() {
-    return current_process;
-}
-
-void process_list() {
-    print_string("\nPID  Name              State    CPU Time\n");
-    print_string("---  ----------------  -------  --------\n");
-    
+void process_list(void) {
     for (int i = 0; i < MAX_PROCESSES; i++) {
-        if (process_table[i]) {
-            process_t* p = process_table[i];
+        process_t* proc = process_table[i];
+        if (proc) {
+            if (proc->pid < 10) print_char(' ');
+            print_dec(proc->pid);
+            print_string("  ");
             
-            // PID
-            if (p->pid < 10) print_char(' ');
-            print_dec(p->pid);
-            print_string("   ");
-            
-            // Name
-            print_string(p->name);
-            for (uint32_t j = strlen(p->name); j < 16; j++) {
+            print_string(proc->name);
+            for (int j = strlen(proc->name); j < 18; j++) {
                 print_char(' ');
             }
-            print_string("  ");
             
-            // State
-            switch(p->state) {
-                case PROCESS_READY:   print_string("READY  "); break;
-                case PROCESS_RUNNING: print_string("RUNNING"); break;
-                case PROCESS_BLOCKED: print_string("BLOCKED"); break;
-                case PROCESS_TERMINATED: print_string("DEAD   "); break;
+            switch (proc->state) {
+                case PROCESS_READY:     print_string("READY   "); break;
+                case PROCESS_RUNNING:   print_string("RUNNING "); break;
+                case PROCESS_BLOCKED:   print_string("BLOCKED "); break;
+                case PROCESS_TERMINATED: print_string("DEAD    "); break;
             }
-            print_string("  ");
             
-            // CPU time
-            print_dec(p->cpu_time);
+            print_dec(proc->cpu_time);
             print_string(" ticks\n");
         }
     }
-    print_char('\n');
+}
+
+process_t* process_get_current(void) {
+    return current_process;
 }

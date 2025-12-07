@@ -2,9 +2,9 @@
 #define PROCESS_H
 
 #include "../../include/types.h"
+#include "../hal/isr.h"
 
-#define MAX_PROCESSES 32
-#define KERNEL_STACK_SIZE 4096
+#define MAX_PROCESSES 64
 
 typedef enum {
     PROCESS_READY,
@@ -12,11 +12,6 @@ typedef enum {
     PROCESS_BLOCKED,
     PROCESS_TERMINATED
 } process_state_t;
-
-typedef struct registers {
-    uint32_t edi, esi, ebp, esp, ebx, edx, ecx, eax;
-    uint32_t eip, eflags;
-} registers_t;
 
 typedef struct process {
     uint32_t pid;
@@ -29,13 +24,14 @@ typedef struct process {
     struct process* next;
 } process_t;
 
-void process_init();
-process_t* process_create(const char* name, void (*entry_point)());
+void process_init(void);
+process_t* process_create(const char* name, void (*entry_point)(void));
 void process_terminate(process_t* proc);
-process_t* process_get_current();
-void process_list();
+void process_list(void);
+process_t* process_get_current(void);
 
+// For scheduler access
 extern process_t* current_process;
-extern process_t* process_table[MAX_PROCESSES]; 
+extern process_t* process_table[MAX_PROCESSES];
 
 #endif

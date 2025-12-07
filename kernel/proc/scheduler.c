@@ -1,22 +1,25 @@
 #include "scheduler.h"
+#include "process.h"
 #include "../core/monitor.h"
+#include "../drivers/timer/pit.h"
+#include "../hal/irq.h"
 
-static process_t* ready_queue_head = 0;
-static process_t* ready_queue_tail = 0;
+// External references from process.c
+extern process_t* current_process;
+extern process_t* process_table[];
+extern uint32_t next_pid;
 
-extern void switch_context(uint32_t* old_esp, uint32_t new_esp);
+#define MAX_PROCESSES 64
 
-void scheduler_init() {
-    print_string("[SCHED] Initializing scheduler...\n");
-    ready_queue_head = 0;
-    ready_queue_tail = 0;
-}
+static process_t* ready_queue_head = NULL;
+static process_t* ready_queue_tail = NULL;
+static uint32_t time_slice = 10;  // 100ms at 100Hz
 
-void scheduler_add(process_t* proc) {
+// Add process to ready queue
+static void enqueue_process(process_t* proc) {
     if (!proc) return;
     
-    proc->state = PROCESS_READY;
-    proc->next = 0;
+    proc->next = NULL;
     
     if (!ready_queue_head) {
         ready_queue_head = proc;
@@ -27,69 +30,91 @@ void scheduler_add(process_t* proc) {
     }
 }
 
-void scheduler_remove(process_t* proc) {
-    if (!proc || !ready_queue_head) return;
-    
-    if (ready_queue_head == proc) {
-        ready_queue_head = proc->next;
-        if (!ready_queue_head) {
-            ready_queue_tail = 0;
-        }
-        return;
+// Remove process from ready queue
+static process_t* dequeue_process(void) {
+    if (!ready_queue_head) {
+        return NULL;
     }
     
-    process_t* current = ready_queue_head;
-    while (current->next) {
-        if (current->next == proc) {
-            current->next = proc->next;
-            if (ready_queue_tail == proc) {
-                ready_queue_tail = current;
-            }
-            return;
-        }
-        current = current->next;
+    process_t* proc = ready_queue_head;
+    ready_queue_head = ready_queue_head->next;
+    
+    if (!ready_queue_head) {
+        ready_queue_tail = NULL;
     }
+    
+    proc->next = NULL;
+    return proc;
 }
 
-void schedule() {
+// Context switch (implemented in switch.asm)
+extern void switch_context(registers_t* old, registers_t* new_ctx);
+
+// Schedule next process
+void schedule(void) {
     if (!current_process) return;
     
     // Save current process state
     if (current_process->state == PROCESS_RUNNING) {
         current_process->state = PROCESS_READY;
-        scheduler_add(current_process);
+        enqueue_process(current_process);
     }
     
-    // Get next process
-    process_t* next = ready_queue_head;
-    if (!next) {
-        // No process to run, return to idle
-        for (int i = 0; i < MAX_PROCESSES; i++) {
-            if (process_table[i] && process_table[i]->pid == 0) {  // ← امسح extern من هنا
-                next = process_table[i];
-                break;
-            }
+    // Find idle process
+    process_t* idle = NULL;
+    for (int i = 0; i < MAX_PROCESSES; i++) {
+        if (process_table[i] && process_table[i]->pid == 0) {
+            idle = process_table[i];
+            break;
         }
-    } else {
-        scheduler_remove(next);
     }
     
-    if (!next || next == current_process) {
-        return;
+    // Get next process or idle
+    process_t* next = dequeue_process();
+    if (!next) {
+        next = idle;
     }
+    
+    if (!next) return;
+    
+    // Switch to next process
+    next->state = PROCESS_RUNNING;
+    process_t* prev = current_process;
+    current_process = next;
+    
+    // Perform context switch
+    if (prev != next) {
+        switch_context(&prev->regs, &next->regs);
+    }
+}
+
+// Timer interrupt handler
+void scheduler_tick(registers_t* regs) {
+    static uint32_t ticks = 0;
+    
+    if (!current_process) return;
     
     // Update CPU time
     current_process->cpu_time++;
     
-    // Switch to next process
-    process_t* old = current_process;
-    current_process = next;
-    next->state = PROCESS_RUNNING;
-    
-    // Context switch
-    switch_context(&old->regs.esp, next->regs.esp);
+    // Check if time slice expired
+    ticks++;
+    if (ticks >= time_slice) {
+        ticks = 0;
+        
+        // Save current register state
+        current_process->regs = *regs;
+        
+        // Schedule next process
+        schedule();
+    }
 }
 
-void yield() {
-    schedule();
+// Initialize scheduler
+void scheduler_init(void) {
+    ready_queue_head = NULL;
+    ready_queue_tail = NULL;
+    
+    // Register timer interrupt handler
+    irq_register_handler(0, scheduler_tick);
 }

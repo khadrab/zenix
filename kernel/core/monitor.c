@@ -1,28 +1,72 @@
 #include "monitor.h"
 
-uint16_t* vga_buffer = (uint16_t*)VGA_MEMORY;
-uint8_t vga_color = 0x0F;
-uint32_t cursor_x = 0;
-uint32_t cursor_y = 0;
+static uint16_t* video_memory = (uint16_t*)0xB8000;
+static uint8_t cursor_x = 0;
+static uint8_t cursor_y = 0;
+static uint8_t attribute = 0x0F;
 
-void scroll_screen() {
-    for (int i = 0; i < (VGA_HEIGHT - 1) * VGA_WIDTH; i++) {
-        vga_buffer[i] = vga_buffer[i + VGA_WIDTH];
-    }
-    
-    for (int i = (VGA_HEIGHT - 1) * VGA_WIDTH; i < VGA_HEIGHT * VGA_WIDTH; i++) {
-        vga_buffer[i] = (vga_color << 8) | ' ';
-    }
-    
-    cursor_y = VGA_HEIGHT - 1;
-}
+// Buffer للسطور القديمة (scrollback)
+#define SCROLLBACK_LINES 100
+static char scrollback_buffer[SCROLLBACK_LINES][80];
+static int scrollback_count = 0;
+static int scrollback_offset = 0;
 
-void clear_screen() {
-    for (int i = 0; i < VGA_WIDTH * VGA_HEIGHT; i++) {
-        vga_buffer[i] = (vga_color << 8) | ' ';
+void clear_screen(void) {
+    for (int i = 0; i < 80 * 25; i++) {
+        video_memory[i] = (attribute << 8) | ' ';
     }
     cursor_x = 0;
     cursor_y = 0;
+    scrollback_count = 0;
+    scrollback_offset = 0;
+}
+
+static void save_line_to_scrollback(void) {
+    if (scrollback_count < SCROLLBACK_LINES) {
+        for (int i = 0; i < 80; i++) {
+            scrollback_buffer[scrollback_count][i] = 
+                (char)(video_memory[i] & 0xFF);
+        }
+        scrollback_count++;
+    }
+}
+
+static void scroll(void) {
+    if (cursor_y >= 25) {
+        // حفظ السطر الأول قبل المسح
+        save_line_to_scrollback();
+        
+        // تحريك كل الأسطر لأعلى
+        for (int i = 0; i < 24 * 80; i++) {
+            video_memory[i] = video_memory[i + 80];
+        }
+        
+        // مسح السطر الأخير
+        for (int i = 24 * 80; i < 25 * 80; i++) {
+            video_memory[i] = (attribute << 8) | ' ';
+        }
+        cursor_y = 24;
+    }
+}
+
+void scroll_up(void) {
+    if (scrollback_offset < scrollback_count) {
+        scrollback_offset++;
+        // إعادة رسم الشاشة من الـ buffer
+        // (تطبيق مبسط - يعرض رسالة فقط)
+        print_string("[Scroll up - ");
+        print_dec(scrollback_offset);
+        print_string("/");
+        print_dec(scrollback_count);
+        print_string("]");
+    }
+}
+
+void scroll_down(void) {
+    if (scrollback_offset > 0) {
+        scrollback_offset--;
+        print_string("[Scroll down]");
+    }
 }
 
 void print_char(char c) {
@@ -32,36 +76,26 @@ void print_char(char c) {
     } else if (c == '\b') {
         if (cursor_x > 0) {
             cursor_x--;
-            uint32_t index = cursor_y * VGA_WIDTH + cursor_x;
-            vga_buffer[index] = (vga_color << 8) | ' ';
+            video_memory[cursor_y * 80 + cursor_x] = (attribute << 8) | ' ';
         }
+    } else if (c == '\t') {
+        cursor_x = (cursor_x + 4) & ~(4 - 1);
     } else {
-        uint32_t index = cursor_y * VGA_WIDTH + cursor_x;
-        vga_buffer[index] = (vga_color << 8) | c;
+        video_memory[cursor_y * 80 + cursor_x] = (attribute << 8) | c;
         cursor_x++;
     }
     
-    if (cursor_x >= VGA_WIDTH) {
+    if (cursor_x >= 80) {
         cursor_x = 0;
         cursor_y++;
     }
     
-    if (cursor_y >= VGA_HEIGHT) {
-        scroll_screen();
-    }
+    scroll();
 }
 
 void print_string(const char* str) {
-    while (*str) {
-        print_char(*str);
-        str++;
-    }
-}
-
-void print_hex(uint32_t n) {
-    const char hex[] = "0123456789ABCDEF";
-    for (int i = 28; i >= 0; i -= 4) {
-        print_char(hex[(n >> i) & 0xF]);
+    for (int i = 0; str[i] != '\0'; i++) {
+        print_char(str[i]);
     }
 }
 
@@ -71,7 +105,7 @@ void print_dec(uint32_t n) {
         return;
     }
     
-    char buffer[12];
+    char buffer[32];
     int i = 0;
     
     while (n > 0) {
@@ -82,4 +116,15 @@ void print_dec(uint32_t n) {
     while (i > 0) {
         print_char(buffer[--i]);
     }
+}
+
+void print_hex(uint32_t n) {
+    const char* hex = "0123456789ABCDEF";
+    for (int i = 28; i >= 0; i -= 4) {
+        print_char(hex[(n >> i) & 0xF]);
+    }
+}
+
+void set_text_color(uint8_t foreground, uint8_t background) {
+    attribute = (background << 4) | (foreground & 0x0F);
 }

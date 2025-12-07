@@ -15,17 +15,6 @@
 #define MULTIBOOT_FLAG_APM     0x200
 #define MULTIBOOT_FLAG_VBE     0x400
 
-typedef struct multiboot_header {
-    uint32_t magic;
-    uint32_t flags;
-    uint32_t checksum;
-    uint32_t header_addr;
-    uint32_t load_addr;
-    uint32_t load_end_addr;
-    uint32_t bss_end_addr;
-    uint32_t entry_addr;
-} multiboot_header_t;
-
 typedef struct multiboot_info {
     uint32_t flags;
     uint32_t mem_lower;
@@ -37,13 +26,13 @@ typedef struct multiboot_info {
     uint32_t syms[4];
     uint32_t mmap_length;
     uint32_t mmap_addr;
-} multiboot_info_t;
+} __attribute__((packed)) multiboot_info_t;
 
-typedef struct multiboot_mmap_entry {
-    uint32_t size;
-    uint64_t addr;
-    uint64_t len;
-    uint32_t type;
-} __attribute__((packed)) multiboot_mmap_entry_t;
+typedef struct multiboot_module {
+    uint32_t mod_start;
+    uint32_t mod_end;
+    uint32_t cmdline;
+    uint32_t reserved;
+} __attribute__((packed)) multiboot_module_t;
 
 #endif

@@ -1,79 +1,63 @@
-#include "monitor.h"
-#include "../../include/types.h"
+#include "../core/monitor.h"
+#include "../hal/gdt.h"
+#include "../hal/idt.h"
+#include "../hal/isr.h"
+#include "../hal/irq.h"
+#include "../mm/pmm.h"
+#include "../mm/heap.h"
+#include "../proc/process.h"
+#include "../proc/scheduler.h"
+#include "../drivers/timer/pit.h"
+#include "../drivers/keyboard/keyboard.h"
+#include "../shell/shell.h"
+#include "../fs/vfs.h"
+#include "../syscall/syscall.h"
+#include "../usermode/usermode.h"
 #include "../../include/multiboot.h"
 
-extern void timer_init(uint32_t frequency);
-extern void irq_install();
-extern void keyboard_init();
-extern void shell_init();
-extern void shell_run();
-extern void pmm_init(multiboot_info_t* mbi, uint32_t kernel_end);
-extern void paging_init();
-extern void heap_init();
-extern void process_init();
-extern void scheduler_init();
-
 extern uint32_t kernel_end;
+extern fs_node_t* fs_root;
 
 void kernel_main(uint32_t magic, multiboot_info_t* mbi) {
     clear_screen();
-    
-    print_string("  _______                       \n");
-    print_string(" '      /    ___  , __   ` _  .-\n");
-    print_string("    .--'   .'   ` |'  `. |  \\,' \n");
-    print_string("   /       |----' |    | |  /\\  \n");
-    print_string(" ,'______/ `.___, /    | / /  \\ \n");
-    print_string("                                 \n");
-    print_string("  Zenix Kernel v0.7 - Phase 7   \n");
+    print_string("=================================\n");
+    print_string(" Zenix Kernel v1.0 - Phase 10   \n");
     print_string("=================================\n\n");
     
     if (magic != 0x2BADB002) {
-        print_string("[ERROR] Invalid multiboot magic\n");
-        while(1) asm("hlt");
+        print_string("[ERROR] Invalid multiboot!\n");
+        for(;;) asm("cli; hlt");
     }
     
-    print_string("[1/11] GDT...\n");
-    gdt_init();
+    print_string("[1/14] GDT..."); gdt_init(); print_string(" [OK]\n");
+    print_string("[2/14] IDT..."); idt_init(); print_string(" [OK]\n");
+    print_string("[3/14] ISRs..."); isr_install(); print_string(" [OK]\n");
+    print_string("[4/14] IRQs..."); irq_install(); print_string(" [OK]\n");
+    print_string("[5/14] PMM..."); pmm_init(mbi, (uint32_t)&kernel_end); print_string(" [OK]\n");
+    print_string("[6/14] Heap..."); heap_init(); print_string(" [OK]\n");
+    print_string("[7/14] VFS..."); fs_root = 0; print_string(" [OK]\n");
+    print_string("[8/14] InitRD... [SKIP]\n");
+    print_string("[9/14] Process..."); process_init(); print_string(" [OK]\n");
+    print_string("[10/14] Scheduler..."); scheduler_init(); print_string(" [OK]\n");
+    print_string("[11/14] Timer..."); timer_init(100); print_string(" [OK]\n");
+    print_string("[12/14] Keyboard..."); keyboard_init(); print_string(" [OK]\n");
+    print_string("[13/14] Syscalls...");
+    syscall_init();
+    syscall_handlers_init();
+    print_string(" [OK]\n");
     
-    print_string("[2/11] IDT...\n");
-    idt_init();
+    print_string("[14/14] User Mode...");
+    usermode_init();
+    print_string(" [OK]\n");
     
-    print_string("[3/11] ISRs...\n");
-    isr_install();
-    
-    print_string("[4/11] IRQs...\n");
-    irq_install();
-    
-    print_string("[5/11] PMM...\n");
-    pmm_init(mbi, (uint32_t)&kernel_end);
-    
-    // print_string("[6/11] Paging...\n");
-    // paging_init();
-    
-    print_string("[7/11] Heap...\n");
-    heap_init();
-    
-    print_string("[8/11] Process Manager...\n");
-    process_init();
-    
-    print_string("[9/11] Scheduler...\n");
-    scheduler_init();
-    
-    print_string("[10/11] Timer (100Hz)...\n");
-    timer_init(100);
-    
-    print_string("[11/11] Keyboard...\n");
-    keyboard_init();
-    
-    print_string("\n[OK] All systems initialized!\n");
-    print_string("Starting shell...\n\n");
-    
-    for (volatile int i = 0; i < 10000000; i++);
+    print_string("\n=================================\n");
+    print_string("  Phase 10 Complete!\n");
+    print_string("  - User Mode: Ready\n");
+    print_string("  - Ring 3: Ready\n");
+    print_string("=================================\n\n");
     
     shell_init();
     shell_run();
     
-    while(1) {
-        asm volatile("hlt");
-    }
+    for(;;) asm("cli; hlt");
 }

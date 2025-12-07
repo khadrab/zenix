@@ -1,3 +1,22 @@
+#!/bin/bash
+echo "Fixing missing files for Zenix..."
+
+# pic.h
+cat > kernel/hal/pic.h << 'EOF'
+#ifndef PIC_H
+#define PIC_H
+#include "../../include/types.h"
+void pic_remap(uint8_t offset1, uint8_t offset2);
+void pic_send_eoi(uint8_t irq);
+void pic_set_mask(uint8_t mask1, uint8_t mask2);
+void pic_disable(void);
+uint16_t pic_get_isr(uint8_t irq);
+#endif
+EOF
+echo "✓ Created kernel/hal/pic.h"
+
+# pic.c
+cat > kernel/hal/pic.c << 'EOF'
 #include "pic.h"
 #include "../../include/io.h"
 #define PIC1_COMMAND 0x20
@@ -56,3 +75,9 @@ uint16_t pic_get_isr(uint8_t irq) {
     outb(PIC2_COMMAND, PIC_READ_ISR);
     return (inb(PIC2_COMMAND) & (1 << (irq - 8))) != 0;
 }
+EOF
+echo "✓ Created kernel/hal/pic.c"
+
+echo ""
+echo "All files created! Now run:"
+echo "  make clean && make all && make run-initrd"

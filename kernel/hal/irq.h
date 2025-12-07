@@ -1,9 +1,12 @@
+// kernel/hal/irq.h
+
 #ifndef IRQ_H
 #define IRQ_H
 
 #include "../../include/types.h"
-#include "isr.h"
+#include "isr.h"  // استيراد isr_handler_t
 
+// IRQ numbers
 #define IRQ0  32
 #define IRQ1  33
 #define IRQ2  34
@@ -21,29 +24,26 @@
 #define IRQ14 46
 #define IRQ15 47
 
-extern void pic_remap(uint8_t offset1, uint8_t offset2);
-extern void pic_send_eoi(uint8_t irq);
-extern void irq_set_mask(uint8_t irq_line);
-extern void irq_clear_mask(uint8_t irq_line);
+// IRQ functions
+void irq_install(void);
+void irq_register_handler(uint8_t irq, isr_handler_t handler);  // استخدام isr_handler_t
 
-void irq_install();
-void irq_register_handler(uint8_t irq, isr_t handler);
-
-extern void irq0();
-extern void irq1();
-extern void irq2();
-extern void irq3();
-extern void irq4();
-extern void irq5();
-extern void irq6();
-extern void irq7();
-extern void irq8();
-extern void irq9();
-extern void irq10();
-extern void irq11();
-extern void irq12();
-extern void irq13();
-extern void irq14();
-extern void irq15();
+// IRQ stubs (32-47)
+extern void irq0(void);
+extern void irq1(void);
+extern void irq2(void);
+extern void irq3(void);
+extern void irq4(void);
+extern void irq5(void);
+extern void irq6(void);
+extern void irq7(void);
+extern void irq8(void);
+extern void irq9(void);
+extern void irq10(void);
+extern void irq11(void);
+extern void irq12(void);
+extern void irq13(void);
+extern void irq14(void);
+extern void irq15(void);
 
 #endif
