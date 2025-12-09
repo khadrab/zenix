@@ -3,7 +3,6 @@
 
 #include "vfs.h"
 
-// يجب أن يطابق تماماً tools/mkinitrd.c
 typedef struct {
     uint32_t nfiles;
 } __attribute__((packed)) initrd_header_t;

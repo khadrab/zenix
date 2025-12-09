@@ -3,10 +3,10 @@
 
 #define BITMAP_SIZE (128 * 1024)
 
-uint32_t total_memory = 0;        // ← امسح static
-uint32_t used_blocks = 0;         // ← امسح static
-uint32_t total_blocks = 0;        // ← امسح static
-uint32_t* memory_bitmap = 0;      // ← امسح static
+uint32_t total_memory = 0;
+uint32_t used_blocks = 0;
+uint32_t total_blocks = 0;
+uint32_t* memory_bitmap = 0;
 
 static inline void bitmap_set(uint32_t bit) {
     memory_bitmap[bit / 32] |= (1 << (bit % 32));

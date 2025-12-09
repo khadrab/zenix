@@ -4,7 +4,7 @@
 #define IRQ_H
 
 #include "../../include/types.h"
-#include "isr.h"  // استيراد isr_handler_t
+#include "isr.h"
 
 // IRQ numbers
 #define IRQ0  32
@@ -26,7 +26,7 @@
 
 // IRQ functions
 void irq_install(void);
-void irq_register_handler(uint8_t irq, isr_handler_t handler);  // استخدام isr_handler_t
+void irq_register_handler(uint8_t irq, isr_handler_t handler);
 
 // IRQ stubs (32-47)
 extern void irq0(void);

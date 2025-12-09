@@ -17,7 +17,7 @@ uint32_t fs_write(fs_node_t* node, uint32_t offset, uint32_t size, uint8_t* buff
 }
 
 void fs_open(fs_node_t* node, uint32_t flags) {
-    (void)flags;  // تجاهل التحذير
+    (void)flags;
     if (node->open != 0) {
         node->open(node);
     }

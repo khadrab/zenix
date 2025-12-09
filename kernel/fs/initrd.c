@@ -54,7 +54,6 @@ static fs_node_t* initrd_finddir(fs_node_t* node, char* name) {
 fs_node_t* initrd_init(uint32_t location) {
     if (location < 0x100000) return 0;
     
-    // قراءة byte by byte - تجنب alignment issues
     uint8_t* data = (uint8_t*)location;
     
     print_string("       First 16 bytes: ");
@@ -66,23 +65,19 @@ fs_node_t* initrd_init(uint32_t location) {
     }
     print_string("\n");
     
-    // قراءة nfiles (little-endian, 4 bytes)
     nroot_nodes = data[0] | (data[1] << 8) | (data[2] << 16) | (data[3] << 24);
     
     print_string("       nfiles = ");
     print_dec(nroot_nodes);
     print_string("\n");
     
-    // تحقق معقول
     if (nroot_nodes == 0 || nroot_nodes > 10) {
         print_string("       [ERROR] Bad nfiles\n");
         return 0;
     }
     
-    // تخطي header (4 bytes)
     uint32_t file_header_offset = 4;
     
-    // إنشاء structures
     initrd_root = (fs_node_t*)kmalloc(sizeof(fs_node_t));
     if (!initrd_root) return 0;
     memset(initrd_root, 0, sizeof(fs_node_t));
@@ -101,12 +96,9 @@ fs_node_t* initrd_init(uint32_t location) {
     if (!root_nodes) { kfree(initrd_dev); kfree(initrd_root); return 0; }
     memset(root_nodes, 0, sizeof(fs_node_t) * nroot_nodes);
     
-    // قراءة file headers يدوياً
     for (uint32_t i = 0; i < nroot_nodes; i++) {
-        uint8_t* fh = data + file_header_offset + i * 73; // sizeof(initrd_file_header_t) = 73
+        uint8_t* fh = data + file_header_offset + i * 73;
         
-        // magic (1 byte) + name (64 bytes) + offset (4) + length (4)
-        // تخطي magic
         char* fname = (char*)(fh + 1);
         uint32_t foffset = fh[65] | (fh[66] << 8) | (fh[67] << 16) | (fh[68] << 24);
         uint32_t flength = fh[69] | (fh[70] << 8) | (fh[71] << 16) | (fh[72] << 24);
@@ -117,14 +109,9 @@ fs_node_t* initrd_init(uint32_t location) {
         root_nodes[i].read = &initrd_read;
         root_nodes[i].inode = i;
         root_nodes[i].length = flength;
-        
-        // Offset نسبة للـ location
-        // في mkinitrd: offset = header + all_file_headers + previous_files
-        // نحتاج نضيف location
         root_nodes[i].impl = location + foffset;
     }
     
-    // تحديث file_headers pointer للقراءة
     file_headers = (initrd_file_header_t*)(location + 4);
     
     print_string("       [OK] Loaded ");

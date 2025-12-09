@@ -5,7 +5,7 @@
 #include "../../include/multiboot.h"
 
 #define PAGE_SIZE 4096
-#define BITMAP_SIZE (128 * 1024)  // ← أضف هذا
+#define BITMAP_SIZE (128 * 1024)
 
 extern uint32_t* memory_bitmap;
 extern uint32_t total_blocks;

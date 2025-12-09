@@ -1,0 +1,151 @@
+// kernel/core/kernel.c - Debug VGA initialization
+#include "../core/monitor.h"
+#include "../hal/gdt.h"
+#include "../hal/idt.h"
+#include "../hal/isr.h"
+#include "../hal/irq.h"
+#include "../mm/pmm.h"
+#include "../mm/heap.h"
+#include "../proc/process.h"
+#include "../proc/scheduler.h"
+#include "../drivers/timer/pit.h"
+#include "../drivers/keyboard/keyboard.h"
+#include "../drivers/vga/vga.h"
+#include "../drivers/mouse/mouse.h"
+#include "../gui/gui.h"
+#include "../shell/shell.h"
+#include "../fs/vfs.h"
+#include "../syscall/syscall.h"
+#include "../usermode/usermode.h"
+#include "../../include/multiboot.h"
+
+extern uint32_t kernel_end;
+extern fs_node_t* fs_root;
+extern vbe_mode_info_t vbe_mode_info;
+
+void kernel_main(uint32_t magic, multiboot_info_t* mbi) {
+    clear_screen();
+    print_string("=================================\n");
+    print_string(" Zenix Kernel v1.0 - Phase 12   \n");
+    print_string(" Ubuntu-Style Modern Design     \n");
+    print_string("=================================\n\n");
+    
+    if (magic != 0x2BADB002) {
+        print_string("[ERROR] Invalid multiboot!\n");
+        for(;;) asm("cli; hlt");
+    }
+    
+    print_string("[1/16] GDT..."); gdt_init(); print_string(" [OK]\n");
+    print_string("[2/16] IDT..."); idt_init(); print_string(" [OK]\n");
+    print_string("[3/16] ISRs..."); isr_install(); print_string(" [OK]\n");
+    print_string("[4/16] IRQs..."); irq_install(); print_string(" [OK]\n");
+    print_string("[5/16] PMM..."); pmm_init(mbi, (uint32_t)&kernel_end); print_string(" [OK]\n");
+    print_string("[6/16] Heap..."); heap_init(); print_string(" [OK]\n");
+    print_string("[7/16] VFS..."); fs_root = 0; print_string(" [OK]\n");
+    print_string("[8/16] InitRD... [SKIP]\n");
+    print_string("[9/16] Process..."); process_init(); print_string(" [OK]\n");
+    print_string("[10/16] Scheduler..."); scheduler_init(); print_string(" [OK]\n");
+    print_string("[11/16] Timer..."); timer_init(100); print_string(" [OK]\n");
+    print_string("[12/16] Keyboard..."); keyboard_init(); print_string(" [OK]\n");
+    print_string("[13/16] Syscalls...");
+    syscall_init();
+    syscall_handlers_init();
+    print_string(" [OK]\n");
+    
+    print_string("[14/16] User Mode...");
+    usermode_init();
+    print_string(" [OK]\n");
+    
+    // DEBUG VBE INFO
+    print_string("\n=== VBE DEBUG INFO ===\n");
+    print_string("Width: "); print_dec(vbe_mode_info.width); print_string("\n");
+    print_string("Height: "); print_dec(vbe_mode_info.height); print_string("\n");
+    print_string("BPP: "); print_dec(vbe_mode_info.bpp); print_string("\n");
+    print_string("Pitch: "); print_dec(vbe_mode_info.pitch); print_string("\n");
+    print_string("FB Addr: 0x"); print_hex(vbe_mode_info.framebuffer); print_string("\n");
+    print_string("======================\n\n");
+    
+    // Check if framebuffer is valid
+    if (vbe_mode_info.framebuffer == 0 || vbe_mode_info.width == 0) {
+        print_string("[ERROR] Invalid framebuffer!\n");
+        print_string("Press any key to continue in text mode...\n");
+        while(1) {
+            asm("hlt");
+        }
+    }
+    
+    print_string("[15/16] Graphics...");
+    print_string(" [OK]\n");
+    
+    print_string("[16/16] Mouse & GUI...");
+    mouse_init();
+    print_string(" [OK]\n");
+    
+    print_string("\n=================================\n");
+    print_string("  Phase 12 Complete!\n");
+    print_string("  - Ubuntu-Style Design\n");
+    print_string("  - Flat Modern Interface\n");
+    print_string("  - Mouse: Enhanced\n");
+    print_string("=================================\n\n");
+    
+    print_string("WAITING 5 SECONDS BEFORE GRAPHICS SWITCH...\n");
+    print_string("Check the info above!\n");
+    
+    // Wait 5 seconds so you can read the debug info
+    for (volatile int i = 0; i < 50000000; i++);
+    
+    print_string("Switching to graphics mode NOW...\n");
+    
+    // Clear text screen
+    clear_screen();
+    
+    // Wait for VGA to stabilize
+    for (volatile int i = 0; i < 10000000; i++);
+    
+    // Initialize VGA
+print_string("Using Mode 13h (320x200)...\n");
+vbe_mode_info.framebuffer = 0xA0000;
+vbe_mode_info.width = 320;
+vbe_mode_info.height = 200;
+vbe_mode_info.bpp = 8;
+vbe_mode_info.pitch = 320;
+vga_init();
+    
+    // Test: Draw something to verify framebuffer works
+    print_string("Drawing test pattern...\n");
+    
+    // Clear to red (for testing)
+    vga_clear_screen(0x0C); // Red
+    vga_swap_buffers();
+    
+    // Wait a bit
+    for (volatile int i = 0; i < 10000000; i++);
+    
+    // Clear to blue
+    vga_clear_screen(0x09);
+    vga_swap_buffers();
+    
+    for (volatile int i = 0; i < 10000000; i++);
+    
+    // Initialize GUI
+    gui_init();
+    
+    // Enable interrupts
+    asm volatile("sti");
+    
+    // Main GUI loop with better timing
+    uint32_t frame_counter = 0;
+    
+    while (1) {
+        gui_update();
+        frame_counter++;
+        
+        for (volatile int i = 0; i < 8000; i++);
+        
+        if (frame_counter % 60 == 0) {
+            for (volatile int i = 0; i < 20000; i++);
+        }
+    }
+    
+    for(;;) asm("cli; hlt");
+}

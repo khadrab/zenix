@@ -1,0 +1,11 @@
+megs: 32
+romimage: file=/usr/share/bochs/BIOS-bochs-latest
+vgaromimage: file=/usr/share/bochs/VGABIOS-lgpl-latest
+
+ata0: enabled=1, ioaddr1=0x1f0, ioaddr2=0x3f0, irq=14
+ata0-master: type=disk, path="zenix.img", mode=flat, cylinders=20, heads=16, spt=63
+
+boot: disk
+log: bochs.log
+mouse: enabled=1
+display_library: x, options="gui_debug"
